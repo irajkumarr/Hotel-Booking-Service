@@ -20,6 +20,8 @@ model Booking {
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
   IdempotencyKey IdempotencyKey?
+
+  @@map("bookings")
 }
 
 model IdempotencyKey {
@@ -30,6 +32,8 @@ model IdempotencyKey {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   booking   Booking? @relation(fields: [bookingId], references: [id])
+
+  @@map("idempotency_keys")
 }
 
 enum BookingStatus {

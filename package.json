@@ -12,6 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "@prisma/client": "^6.16.2",
+    "axios": "^1.12.2",
     "bullmq": "^5.58.7",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
