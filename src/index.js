@@ -3,6 +3,9 @@ const { ServerConfig } = require("./config");
 const apiRoutes = require("./routes");
 const { errorHandler } = require("./middlewares");
 const morgan = require("morgan");
+const {
+  attachCorrelationIdMiddleware,
+} = require("./middlewares/correlation-middleware");
 
 const app = express();
 
@@ -10,6 +13,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
+app.use(attachCorrelationIdMiddleware);
 
 //routes
 app.use("/api", apiRoutes);
