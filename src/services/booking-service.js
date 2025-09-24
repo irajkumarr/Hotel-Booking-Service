@@ -94,17 +94,17 @@ async function confirmBooking(idempotencyKey) {
       tx,
       idempotencyKeyData.booking_id
     );
-    // 6️⃣ Notify Room Service to mark dates as booked
-    const update = await axios.patch(
+    // Notify Room Service to mark dates as booked
+    await axios.patch(
       `${ServerConfig.HOTEL_SERVICE_URL}/api/v1/rooms/${booking.roomId}`,
       {
         isBooked: true,
         bookingId: booking.id,
       }
     );
-    console.log(update);
+
     await bookingRepository.finalizeIdempotencyKey(tx, idempotencyKey);
-    console.log(booking);
+
     return booking;
   });
 }
