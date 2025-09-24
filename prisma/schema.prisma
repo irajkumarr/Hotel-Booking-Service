@@ -15,6 +15,8 @@ model Booking {
   bookingAmount  Int             @map("booking_amount")
   status         BookingStatus   @default(PENDING)
   totalGuests    Int             @map("total_guests")
+  checkInDate    DateTime        @map("check_in_date")
+  checkOutDate   DateTime        @map("check_out_date")
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
   IdempotencyKey IdempotencyKey?
