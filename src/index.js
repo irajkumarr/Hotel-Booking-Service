@@ -23,5 +23,6 @@ app.use(errorHandler);
 
 //Server starting
 app.listen(ServerConfig.PORT, () => {
-  console.log(`Server started at PORT ${ServerConfig.PORT}`);
+  Logger.info(`🚀 Server started at PORT ${ServerConfig.PORT}`);
+  Logger.info(`Press Ctrl+C to stop the server.`);
 });
