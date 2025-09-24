@@ -1,5 +1,5 @@
 const express = require("express");
-const { ServerConfig } = require("./config");
+const { ServerConfig, Logger } = require("./config");
 const apiRoutes = require("./routes");
 const { errorHandler } = require("./middlewares");
 const morgan = require("morgan");
