@@ -5,6 +5,13 @@ const ROLE_TYPE = Object.freeze({
   HOTEL_MANAGER: "HOTEL_MANAGER",
 });
 
+const BOOKING_STATUS = Object.freeze({
+  PENDING: "PENDING",
+  CONFIRMED: "CONFIRMED",
+  CANCELLED: "CANCELLED",
+});
+
 module.exports = {
   ROLE_TYPE,
+  BOOKING_STATUS,
 };

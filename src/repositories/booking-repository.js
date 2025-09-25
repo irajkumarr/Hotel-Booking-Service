@@ -3,6 +3,8 @@ const { prisma } = require("../config");
 const { AppError } = require("../utils");
 const CrudRepository = require("./crud-repository");
 const { validate } = require("uuid");
+const { Enums } = require("../utils/commons");
+const { CONFIRMED, CANCELLED } = Enums.BOOKING_STATUS;
 
 class BookingRepository extends CrudRepository {
   constructor() {
@@ -65,7 +67,7 @@ class BookingRepository extends CrudRepository {
         id: bookingId,
       },
       data: {
-        status: "CONFIRMED",
+        status: CONFIRMED,
       },
     });
     return booking;
@@ -77,7 +79,7 @@ class BookingRepository extends CrudRepository {
         id: bookingId,
       },
       data: {
-        status: "CANCELLED",
+        status: CANCELLED,
       },
     });
     return booking;
@@ -101,7 +103,7 @@ class BookingRepository extends CrudRepository {
     const oldBookings = await tx.booking.findMany({
       where: {
         createdAt: { lt: timestamp },
-        status: { notIn: ["CONFIRMED", "CANCELLED"] },
+        status: { notIn: [CONFIRMED, CANCELLED] },
       },
     });
 
@@ -110,7 +112,7 @@ class BookingRepository extends CrudRepository {
     // 2. Cancel them
     await tx.booking.updateMany({
       where: { id: { in: oldBookings.map((b) => b.id) } },
-      data: { status: "CANCELLED" },
+      data: { status: CANCELLED },
     });
 
     return oldBookings; // return for freeing rooms
