@@ -95,6 +95,26 @@ class BookingRepository extends CrudRepository {
 
     return idempotencyKey;
   }
+
+  async cancelOldBookings(tx, timestamp) {
+    // 1. Find all old pending bookings
+    const oldBookings = await tx.booking.findMany({
+      where: {
+        createdAt: { lt: timestamp },
+        status: { notIn: ["CONFIRMED", "CANCELLED"] },
+      },
+    });
+
+    if (oldBookings.length === 0) return [];
+
+    // 2. Cancel them
+    await tx.booking.updateMany({
+      where: { id: { in: oldBookings.map((b) => b.id) } },
+      data: { status: "CANCELLED" },
+    });
+
+    return oldBookings; // return for freeing rooms
+  }
 }
 
 module.exports = BookingRepository;

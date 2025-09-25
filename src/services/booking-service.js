@@ -1,7 +1,7 @@
 const { StatusCodes } = require("http-status-codes");
 const { BookingRepository } = require("../repositories");
 const { AppError } = require("../utils");
-const { ServerConfig, prisma } = require("../config");
+const { ServerConfig, prisma, Logger } = require("../config");
 const { redlock } = require("../config/redis-config");
 const axios = require("axios");
 const {
@@ -175,4 +175,40 @@ async function confirmBooking(idempotencyKey) {
   });
 }
 
-module.exports = { createBooking, confirmBooking };
+async function cancelOldBookings() {
+  try {
+    const time = new Date(Date.now() - 1000 * 60 * 5); // 5 mins ago
+
+    const oldBookings = await prisma.$transaction(async (tx) => {
+      return bookingRepository.cancelOldBookings(tx, time);
+    });
+
+    // After DB update, free rooms in Hotel Service
+    for (const booking of oldBookings) {
+      try {
+        await axios.patch(
+          `${ServerConfig.HOTEL_SERVICE_URL}/api/v1/rooms/${booking.roomId}/book`,
+          { isBooked: false, bookingId: null }
+        );
+      } catch (err) {
+        Logger.error(
+          `⚠️ Failed to free room ${booking.roomId} for booking ${booking.id}:${err.message}`
+        );
+      }
+    }
+
+    return oldBookings;
+  } catch (error) {
+    Logger.error("Error canceling old bookings: error.message");
+    throw new AppError(
+      `Error canceling old bookings:${error.message}`,
+      StatusCodes.INTERNAL_SERVER_ERROR
+    );
+  }
+}
+
+module.exports = {
+  createBooking,
+  confirmBooking,
+  cancelOldBookings,
+};
