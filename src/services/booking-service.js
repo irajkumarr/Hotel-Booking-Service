@@ -14,44 +14,91 @@ async function createBooking(data) {
   const ttl = ServerConfig.LOCK_TTL;
   const bookingResource = `room:${data.roomId}:${data.checkInDate}`;
 
+  // Check availability date
+  const checkInDate = new Date(data.checkInDate);
+  checkInDate.setUTCHours(0, 0, 0, 0);
+
+  const checkOutDate = new Date(data.checkOutDate);
+  checkOutDate.setUTCHours(0, 0, 0, 0);
+
+  const todayDate = new Date();
+  todayDate.setUTCHours(0, 0, 0, 0);
+
+  if (checkInDate < todayDate) {
+    throw new AppError(
+      "Check in date must be today date or in the future",
+      StatusCodes.BAD_REQUEST
+    );
+  }
   try {
-    //  Acquire distributed lock
+    //  Acquire distributed lock for multiple concurrent booking
     const lock = await redlock.acquire([bookingResource], ttl);
 
     // Check availability via hotel Service API
-    const hotelServiceUrl = `${ServerConfig.HOTEL_SERVICE_URL}/api/v1/hotels/${data.hotelId}`;
-    const hotelResponse = await axios.get(hotelServiceUrl);
-    const hotelData = hotelResponse.data.data;
-
-    if (!hotelData) {
-      throw new AppError("Hotel not found", StatusCodes.NOT_FOUND);
-    }
-    // Check availability via hotel Service API
     const roomServiceUrl = `${ServerConfig.HOTEL_SERVICE_URL}/api/v1/rooms/${data.roomId}`;
-    const roomResponse = await axios.get(roomServiceUrl);
-    const roomData = roomResponse.data.data;
+    let roomData;
+    try {
+      const roomResponse = await axios.get(roomServiceUrl);
+      roomData = roomResponse.data.data;
+      if (!roomData) {
+        throw new AppError(
+          "Room not found in the database",
+          StatusCodes.NOT_FOUND
+        );
+      }
 
-    if (!roomData) {
-      throw new AppError("Room not found", StatusCodes.NOT_FOUND);
-    }
-
-    if (roomData.isBooked) {
-      throw new AppError(
-        "Room is not available for selected dates",
-        StatusCodes.CONFLICT
-      );
+      if (roomData.isBooked) {
+        throw new AppError(
+          "Room is not available for selected dates",
+          StatusCodes.CONFLICT
+        );
+      }
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      if (error.response) {
+        if (error.response.status === StatusCodes.NOT_FOUND) {
+          throw new AppError(
+            "Room not found or already booked",
+            StatusCodes.NOT_FOUND
+          );
+        }
+        throw new AppError(
+          error.response.data?.message || "Hotel service error",
+          error.response.status
+        );
+      } else if (error.request) {
+        throw new AppError(
+          "No response from Hotel service",
+          StatusCodes.SERVICE_UNAVAILABLE
+        );
+      } else {
+        throw new AppError(
+          "Unexpected error while calling Hotel service",
+          StatusCodes.INTERNAL_SERVER_ERROR
+        );
+      }
     }
 
     // Create booking in Booking Service
     const booking = await bookingRepository.createBooking({
       userId: data.userId,
-      hotelId: data.hotelId,
-      roomId: data.roomId,
+      hotelId: roomData.hotelId,
+      roomId: roomData.id,
       bookingAmount: roomData.price,
       totalGuests: data.totalGuests || 1,
       checkInDate: new Date(data.checkInDate),
       checkOutDate: new Date(data.checkOutDate),
     });
+    // Update room as booked in Hotel Service
+    await axios.patch(
+      `${ServerConfig.HOTEL_SERVICE_URL}/api/v1/rooms/${booking.roomId}/book`,
+      {
+        isBooked: true,
+        bookingId: booking.id,
+      }
+    );
 
     // Generate and store idempotency key
     const idempotencyKey = generateIdempotencyKey();
@@ -60,10 +107,16 @@ async function createBooking(data) {
     // Release lock
     await lock.unlock();
 
-    return { bookingId: booking.id, idempotencyKey };
+    return {
+      bookingId: booking.id,
+      idempotencyKey,
+      status: booking.status,
+      checkInDate: booking.checkInDate,
+      roomId: booking.roomId,
+    };
   } catch (error) {
     // If error occurred, automatically the lock expires after TTL
-    console.error(error);
+    // console.error(error);
     if (error instanceof AppError) {
       throw error;
     }
@@ -90,22 +143,35 @@ async function confirmBooking(idempotencyKey) {
       );
     }
 
+    //  Confirm booking in Booking Service
     const booking = await bookingRepository.confirmBooking(
       tx,
       idempotencyKeyData.booking_id
     );
-    // Notify Room Service to mark dates as booked
-    await axios.patch(
-      `${ServerConfig.HOTEL_SERVICE_URL}/api/v1/rooms/${booking.roomId}`,
-      {
-        isBooked: true,
-        bookingId: booking.id,
-      }
-    );
 
+    //  Fetch room details with category + hotel
+    let roomData = null;
+    try {
+      const roomResponse = await axios.get(
+        `${ServerConfig.HOTEL_SERVICE_URL}/api/v1/rooms/${booking.roomId}`
+      );
+      roomData = roomResponse.data.data;
+    } catch (error) {
+      throw new AppError(
+        "Failed to fetch room details from Hotel Service",
+        StatusCodes.SERVICE_UNAVAILABLE
+      );
+    }
+
+    //  Finalize idempotency
     await bookingRepository.finalizeIdempotencyKey(tx, idempotencyKey);
 
-    return booking;
+    //  Return enriched booking object
+    return {
+      booking,
+
+      room: roomData,
+    };
   });
 }
 
