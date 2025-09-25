@@ -4,7 +4,6 @@ const { Logger } = require("../config");
 
 function bookingScheduler() {
   cron.schedule("*/5 * * * *", async () => {
-    Logger.info("Running cancelOldBookings cron");
     try {
       const cancelledBookings = await BookingService.cancelOldBookings();
 

@@ -4,6 +4,8 @@ const { AppError } = require("../utils");
 const { ServerConfig, prisma, Logger } = require("../config");
 const { redlock } = require("../config/redis-config");
 const axios = require("axios");
+const { NotificationDto } = require("../dto/notification-dto");
+const { addBookingEmailJob } = require("../producers/email-producer");
 const {
   generateIdempotencyKey,
 } = require("../utils/helpers/generate-idempotency-key");
@@ -148,6 +150,17 @@ async function confirmBooking(idempotencyKey) {
       tx,
       idempotencyKeyData.booking_id
     );
+    //send email
+    const notificationPayload = NotificationDto({
+      to: data.email,
+      subject: "Booking Details",
+      templateId: "booking-email",
+      params: {
+        name: data.firstName,
+        verificationToken: verificationToken,
+      },
+    });
+    await addBookingEmailJob(notificationPayload);
 
     //  Fetch room details with category + hotel
     let roomData = null;
@@ -169,7 +182,6 @@ async function confirmBooking(idempotencyKey) {
     //  Return enriched booking object
     return {
       booking,
-
       room: roomData,
     };
   });
