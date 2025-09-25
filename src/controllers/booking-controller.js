@@ -13,6 +13,7 @@ const createBooking = asyncHandler(async (req, res) => {
     checkOutDate,
     totalGuests,
     userId,
+    authHeader: req.headers.authorization,
   });
   SuccessResponse.data = booking;
 
@@ -22,7 +23,7 @@ const createBooking = asyncHandler(async (req, res) => {
 const confirmBooking = asyncHandler(async (req, res) => {
   const booking = await BookingService.confirmBooking(
     req.params.idempotencyKey,
-   req.headers.authorization
+    req.headers.authorization
   );
   SuccessResponse.data = booking;
 

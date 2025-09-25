@@ -13,6 +13,7 @@ const {
 const bookingRepository = new BookingRepository();
 
 async function createBooking(data) {
+  const token = data.authHeader.split(" ")[1];
   const ttl = ServerConfig.LOCK_TTL;
   const bookingResource = `room:${data.roomId}:${data.checkInDate}`;
 
@@ -118,7 +119,7 @@ async function createBooking(data) {
     };
   } catch (error) {
     // If error occurred, automatically the lock expires after TTL
-    // console.error(error);
+    console.error(error);
     if (error instanceof AppError) {
       throw error;
     }
