@@ -72,7 +72,6 @@ async function checkAuth(req, res, next) {
 function authorizeRoles(allowedRoles = []) {
   return (req, res, next) => {
     try {
-      console.log(req.user);
       if (!req.user || !allowedRoles.includes(req.user.role)) {
         throw new AppError(
           "You do not have permission to perform this action",
