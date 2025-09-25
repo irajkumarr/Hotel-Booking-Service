@@ -129,7 +129,8 @@ async function createBooking(data) {
   }
 }
 
-async function confirmBooking(idempotencyKey) {
+async function confirmBooking(idempotencyKey, authHeader) {
+  const token = authHeader.split(" ")[1];
   return await prisma.$transaction(async (tx) => {
     const idempotencyKeyData =
       await bookingRepository.getIdempotencyKeyWithLock(tx, idempotencyKey);
@@ -150,17 +151,24 @@ async function confirmBooking(idempotencyKey) {
       tx,
       idempotencyKeyData.booking_id
     );
-    //send email
-    const notificationPayload = NotificationDto({
-      to: data.email,
-      subject: "Booking Details",
-      templateId: "booking-email",
-      params: {
-        name: data.firstName,
-        verificationToken: verificationToken,
-      },
-    });
-    await addBookingEmailJob(notificationPayload);
+    //  Fetch user details from User Service
+    let userData = null;
+    try {
+      const userServiceUrl = `${ServerConfig.USER_SERVICE_URL}/api/v1/users`;
+      const userResponse = await axios.get(userServiceUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      userData = userResponse.data.data;
+    } catch (error) {
+      console.log(error);
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError(
+        "Failed to fetch user details from User Service",
+        StatusCodes.SERVICE_UNAVAILABLE
+      );
+    }
 
     //  Fetch room details with category + hotel
     let roomData = null;
@@ -175,6 +183,24 @@ async function confirmBooking(idempotencyKey) {
         StatusCodes.SERVICE_UNAVAILABLE
       );
     }
+    //  Send email to user
+    const notificationPayload = NotificationDto({
+      to: userData.email, // user's email from User Service
+      subject: "Your Booking is Confirmed!",
+      templateId: "booking-email", // an identifier for the email template
+      params: {
+        name: userData.firstName, // User's first name
+        bookingId: booking.id, // Booking ID
+        hotelName: roomData.hotel.name, // Hotel name
+        hotelAddress: roomData.hotel.address, // Hotel address
+        roomType: roomData.roomCategory.roomType, // Room type (SINGLE, DOUBLE, etc.)
+        price: booking.bookingAmount, // Booking amount
+        checkInDate: booking.checkInDate.toDateString(), // format as needed
+        checkOutDate: booking.checkOutDate.toDateString(),
+        totalGuests: booking.totalGuests,
+      },
+    });
+    await addBookingEmailJob(notificationPayload);
 
     //  Finalize idempotency
     await bookingRepository.finalizeIdempotencyKey(tx, idempotencyKey);

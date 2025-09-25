@@ -9,4 +9,5 @@ module.exports = {
   REDIS_URL: process.env.REDIS_URL,
   LOCK_TTL: process.env.LOCK_TTL,
   HOTEL_SERVICE_URL: process.env.HOTEL_SERVICE_URL,
+  USER_SERVICE_URL: process.env.USER_SERVICE_URL,
 };
