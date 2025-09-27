@@ -22,7 +22,7 @@
     "morgan": "^1.10.1",
     "node-cron": "^4.2.1",
     "redlock": "^4.2.0",
-    "uuid": "^13.0.0",
+    "uuid": "^8.3.2",
     "winston": "^3.17.0",
     "winston-daily-rotate-file": "^5.0.0"
   },
